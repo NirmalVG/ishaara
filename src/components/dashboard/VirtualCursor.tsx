@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { handTracker } from "@/lib/handTracking"
 import { gestureEngine } from "@/lib/gestureEngine"
 import { useSettingsStore } from "@/store/useSettingStore"
+import { isMobileDevice } from "@/utils/isMobile"
 
 export default function VirtualCursor() {
   const [position, setPosition] = useState({ x: -100, y: -100 })
@@ -17,6 +18,7 @@ export default function VirtualCursor() {
   const hasInitializedPos = useRef(false)
 
   useEffect(() => {
+    if (isMobileDevice()) return
     let animationFrameId: number
 
     // Initialize cursor to the center of the screen on first load

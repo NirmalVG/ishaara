@@ -5,6 +5,7 @@ import { Hand, Loader2, MousePointerClick } from "lucide-react" // <-- Added Mou
 import { handTracker } from "@/lib/handTracking"
 import { gestureEngine, GestureType } from "@/lib/gestureEngine" // <-- Added Gesture Engine import
 import { DrawingUtils, HandLandmarker } from "@mediapipe/tasks-vision"
+import { isMobileDevice } from "@/utils/isMobile"
 
 export default function CameraCanvas() {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -18,6 +19,10 @@ export default function CameraCanvas() {
     let animationFrameId: number
 
     async function startSystem() {
+      if (isMobileDevice()) {
+        setIsReady(false)
+        return
+      }
       // 1. Initialize the AI Model
       await handTracker.initialize()
 
