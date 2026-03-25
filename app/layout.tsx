@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import TopNav from "@/components/layout/TopNav"
 import VirtualCursor from "@/components/dashboard/VirtualCursor"
+import VirtualKeyboard from "@/components/dashboard/VirtualKeyboard"
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,6 +32,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <VirtualCursor />
+        <VirtualKeyboard />
 
         <TopNav />
         {children}

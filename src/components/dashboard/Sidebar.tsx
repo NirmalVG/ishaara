@@ -6,11 +6,17 @@ import {
   MousePointerClick,
   ArrowUpDown,
   Keyboard,
+  Copy, // <-- NEW
+  ThumbsUp, // <-- NEW
 } from "lucide-react"
 import SliderControl from "../ui/SliderControl"
 import ToggleControl from "../ui/ToggleControl"
+import { useSettingsStore } from "@/store/useSettingStore"
 
 export default function Sidebar() {
+  const { cursorSpeed, cursorSmoothing, setCursorSpeed, setCursorSmoothing } =
+    useSettingsStore()
+
   return (
     <aside className="w-full h-full bg-[#131823] border border-slate-800 rounded-2xl p-6 flex flex-col gap-8 overflow-y-auto">
       {/* Header */}
@@ -49,16 +55,18 @@ export default function Sidebar() {
             min={0.5}
             max={3}
             step={0.1}
-            defaultValue={1.25}
-            valueLabel="x1.25"
+            value={cursorSpeed}
+            onChange={setCursorSpeed}
+            valueLabel={`x${cursorSpeed.toFixed(2)}`}
           />
           <SliderControl
             label="Smoothing (Kalman)"
-            min={1}
-            max={10}
-            step={1}
-            defaultValue={8}
-            valueLabel="High"
+            min={0.1}
+            max={0.9}
+            step={0.1}
+            value={cursorSmoothing}
+            onChange={setCursorSmoothing}
+            valueLabel={cursorSmoothing.toFixed(1)}
           />
           <div className="h-px w-full bg-slate-800 my-2"></div>
           <ToggleControl label="Show Hand Landmarks" defaultChecked={true} />
@@ -72,7 +80,7 @@ export default function Sidebar() {
         </h3>
 
         <div className="flex flex-col gap-4">
-          {/* Gesture 1 */}
+          {/* Gesture 1: Pinch */}
           <div className="flex items-center gap-4">
             <div className="bg-slate-800/50 p-2.5 rounded-lg border border-slate-700">
               <MousePointerClick className="w-5 h-5 text-slate-300" />
@@ -83,7 +91,7 @@ export default function Sidebar() {
             </div>
           </div>
 
-          {/* Gesture 2 */}
+          {/* Gesture 2: Two Fingers */}
           <div className="flex items-center gap-4">
             <div className="bg-slate-800/50 p-2.5 rounded-lg border border-slate-700">
               <ArrowUpDown className="w-5 h-5 text-slate-300" />
@@ -96,16 +104,40 @@ export default function Sidebar() {
             </div>
           </div>
 
-          {/* Gesture 3 */}
+          {/* Gesture 3: Fist */}
           <div className="flex items-center gap-4">
             <div className="bg-slate-800/50 p-2.5 rounded-lg border border-slate-700">
               <Keyboard className="w-5 h-5 text-slate-300" />
             </div>
             <div className="flex flex-col">
               <span className="text-sm font-bold text-slate-200">Fist</span>
-              <span className="text-xs text-slate-500">
-                Open Virtual Keyboard
+              <span className="text-xs text-slate-500">Toggle Keyboard</span>
+            </div>
+          </div>
+
+          {/* Gesture 4: Peace Sign (NEW) */}
+          <div className="flex items-center gap-4">
+            <div className="bg-slate-800/50 p-2.5 rounded-lg border border-slate-700">
+              <Copy className="w-5 h-5 text-slate-300" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-slate-200">
+                Peace Sign
               </span>
+              <span className="text-xs text-slate-500">Copy Text</span>
+            </div>
+          </div>
+
+          {/* Gesture 5: Thumbs Up (NEW) */}
+          <div className="flex items-center gap-4">
+            <div className="bg-slate-800/50 p-2.5 rounded-lg border border-slate-700">
+              <ThumbsUp className="w-5 h-5 text-slate-300" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-bold text-slate-200">
+                Thumbs Up
+              </span>
+              <span className="text-xs text-slate-500">Paste Text</span>
             </div>
           </div>
         </div>

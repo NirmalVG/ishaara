@@ -1,13 +1,12 @@
 "use client"
 
-import { useState } from "react"
-
 interface SliderControlProps {
   label: string
   min: number
   max: number
   step: number
-  defaultValue: number
+  value: number
+  onChange: (val: number) => void
   valueLabel?: string
 }
 
@@ -16,11 +15,10 @@ export default function SliderControl({
   min,
   max,
   step,
-  defaultValue,
+  value,
+  onChange,
   valueLabel,
 }: SliderControlProps) {
-  const [value, setValue] = useState(defaultValue)
-
   return (
     <div className="flex flex-col gap-3 py-2">
       <div className="flex justify-between items-center">
@@ -36,7 +34,7 @@ export default function SliderControl({
         max={max}
         step={step}
         value={value}
-        onChange={(e) => setValue(Number(e.target.value))}
+        onChange={(e) => onChange(Number(e.target.value))} // <-- Push changes up
         className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-[#6B9DFE] hover:accent-blue-400"
       />
     </div>

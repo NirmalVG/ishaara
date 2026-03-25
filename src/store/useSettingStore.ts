@@ -1,18 +1,36 @@
 import { create } from "zustand"
 
 interface SettingsState {
-  cursorSpeed: number // Multiplier (1.5x means 50% faster movement)
-  cursorSmoothing: number // 0.0 to 1.0 (Higher = more buttery/laggy, Lower = raw/snappy)
+  cursorSpeed: number
+  cursorSmoothing: number
+
+  // NEW: Keyboard State
+  isKeyboardOpen: boolean
+  typedText: string
 
   setCursorSpeed: (speed: number) => void
   setCursorSmoothing: (smoothing: number) => void
+
+  // NEW: Keyboard Actions
+  setKeyboardOpen: (isOpen: boolean) => void
+  appendChar: (char: string) => void
+  backspace: () => void
+  clearText: () => void
 }
 
 export const useSettingsStore = create<SettingsState>((set) => ({
-  // Default Future-Proof Settings
   cursorSpeed: 1.5,
   cursorSmoothing: 0.6,
 
+  isKeyboardOpen: false,
+  typedText: "",
+
   setCursorSpeed: (speed) => set({ cursorSpeed: speed }),
   setCursorSmoothing: (smoothing) => set({ cursorSmoothing: smoothing }),
+
+  setKeyboardOpen: (isOpen) => set({ isKeyboardOpen: isOpen }),
+  appendChar: (char) => set((state) => ({ typedText: state.typedText + char })),
+  backspace: () =>
+    set((state) => ({ typedText: state.typedText.slice(0, -1) })),
+  clearText: () => set({ typedText: "" }),
 }))
