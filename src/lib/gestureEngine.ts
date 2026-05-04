@@ -52,9 +52,11 @@ export class GestureEngine {
       this.getDistance(pinkyTip, wrist) < this.getDistance(pinkyMcp, wrist)
 
     // Thumb logic: Is the tip significantly further from the wrist than its base?
+    // Using 1.5x multiplier to require a very deliberate thumb extension.
+    // This prevents a loose fist from accidentally registering as ThumbsUp.
     const isThumbExtended =
       this.getDistance(thumbTip, wrist) >
-      this.getDistance(thumbMcp, wrist) * 1.2
+      this.getDistance(thumbMcp, wrist) * 1.5
 
     // 2. Detect Fist & Thumbs Up
     if (isIndexCurled && isMiddleCurled && isRingCurled && isPinkyCurled) {

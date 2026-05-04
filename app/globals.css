@@ -1,12 +1,17 @@
 @import "tailwindcss";
 
-/* Tailwind v4 CSS-first configuration! 
-  We define our custom Ishaara variables right here.
-*/
+/* ═══════════════════════════════════════════════════════════════
+   ISHAARA — Ultra-Futuristic Design System
+   Holographic Dark Theme · Sci-Fi Glassmorphism · Premium Motion
+   ═══════════════════════════════════════════════════════════════ */
+
 @theme {
   --color-brand-bg: #0b0f17;
   --color-brand-panel: #131823;
   --color-brand-blue: #6b9dfe;
+  --color-brand-cyan: #22d3ee;
+  --color-brand-glow: #3b82f6;
+  --color-brand-purple: #a78bfa;
 }
 
 @layer base {
@@ -14,4 +19,275 @@
     background-color: var(--color-brand-bg);
     color: var(--color-slate-100);
   }
+
+  /* ── Premium Scrollbar ── */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(107, 157, 254, 0.25);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(107, 157, 254, 0.5);
+  }
+
+  /* ── Focus Rings ── */
+  *:focus-visible {
+    outline: 2px solid var(--color-brand-blue);
+    outline-offset: 2px;
+    border-radius: 8px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   KEYFRAME ANIMATIONS
+   ═══════════════════════════════════════════════════════════════ */
+
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.4; filter: blur(20px); }
+  50% { opacity: 0.8; filter: blur(30px); }
+}
+
+@keyframes holographic-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes border-trace {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 200% 200%; }
+}
+
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes key-press-ripple {
+  0% { transform: scale(0.3); opacity: 0.8; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes slide-up-enter {
+  0% { transform: translateY(40px) scale(0.96); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes key-stagger-in {
+  0% { transform: scale(0.7) translateY(10px); opacity: 0; }
+  100% { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+@keyframes gradient-text-cycle {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+@keyframes fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILITY CLASSES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Animated gradient text */
+.gradient-text-animated {
+  background: linear-gradient(
+    270deg,
+    #6b9dfe, #22d3ee, #a78bfa, #6b9dfe
+  );
+  background-size: 300% 300%;
+  animation: gradient-text-cycle 6s ease infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Scanline overlay */
+.scanline-overlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(107, 157, 254, 0.015) 2px,
+    rgba(107, 157, 254, 0.015) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Moving scanline beam */
+.scanline-beam::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(107, 157, 254, 0.3), transparent);
+  animation: scanline 4s linear infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Holographic border */
+.holo-border {
+  position: relative;
+}
+.holo-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(107, 157, 254, 0.4),
+    rgba(34, 211, 238, 0.2),
+    rgba(167, 139, 250, 0.3),
+    rgba(107, 157, 254, 0.1),
+    rgba(34, 211, 238, 0.4)
+  );
+  background-size: 200% 200%;
+  animation: border-trace 4s linear infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Glass effect */
+.glass-panel {
+  background: linear-gradient(
+    135deg,
+    rgba(19, 24, 35, 0.95),
+    rgba(11, 15, 23, 0.98)
+  );
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RANGE INPUT — Custom Sci-Fi Slider
+   ═══════════════════════════════════════════════════════════════ */
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 20px;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  background: linear-gradient(90deg, rgba(107, 157, 254, 0.15), rgba(107, 157, 254, 0.25));
+  border-radius: 999px;
+  border: 1px solid rgba(107, 157, 254, 0.1);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #6b9dfe;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  margin-top: -7px;
+  box-shadow: 0 0 12px rgba(107, 157, 254, 0.6), 0 0 4px rgba(107, 157, 254, 0.8);
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 20px rgba(107, 157, 254, 0.8), 0 0 8px rgba(107, 157, 254, 1);
+  transform: scale(1.15);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  background: linear-gradient(90deg, rgba(107, 157, 254, 0.15), rgba(107, 157, 254, 0.25));
+  border-radius: 999px;
+  border: 1px solid rgba(107, 157, 254, 0.1);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #6b9dfe;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 12px rgba(107, 157, 254, 0.6);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   KEYBOARD KEY STYLES
+   ═══════════════════════════════════════════════════════════════ */
+
+.kb-key {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.12s cubic-bezier(0.23, 1, 0.32, 1);
+  will-change: transform, box-shadow;
+}
+
+.kb-key::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at center, rgba(107, 157, 254, 0.15), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.kb-key:hover::before {
+  opacity: 1;
+}
+
+.kb-key:active {
+  transform: scale(0.9) !important;
+}
+
+/* Ripple container for key press */
+.kb-key .ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(107, 157, 254, 0.5);
+  animation: key-press-ripple 0.5s ease-out forwards;
+  pointer-events: none;
 }

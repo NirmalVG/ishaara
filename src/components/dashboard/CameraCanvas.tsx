@@ -1,47 +1,70 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { Hand, Loader2, MousePointerClick } from "lucide-react" // <-- Added MousePointerClick
+import { useEffect, useRef, useState, useCallback } from "react"
+import { Hand, Loader2, MousePointerClick, ArrowUpDown, Keyboard, Copy, ThumbsUp, Cpu, ShieldCheck } from "lucide-react"
 import { handTracker } from "@/lib/handTracking"
-import { gestureEngine, GestureType } from "@/lib/gestureEngine" // <-- Added Gesture Engine import
+import { gestureEngine, GestureType } from "@/lib/gestureEngine"
 import { DrawingUtils, HandLandmarker } from "@mediapipe/tasks-vision"
 import { isMobileDevice } from "@/utils/isMobile"
+
+const GESTURE_LABELS: Record<GestureType, { label: string; icon: string }> = {
+  None: { label: "Move hand to begin", icon: "hand" },
+  Pinch: { label: "Click (Pinch)", icon: "click" },
+  TwoFingers: { label: "Scrolling", icon: "scroll" },
+  Fist: { label: "Hold for Keyboard", icon: "fist" },
+  Peace: { label: "Copy (Peace Sign)", icon: "peace" },
+  ThumbsUp: { label: "Paste (Thumbs Up)", icon: "thumbsup" },
+}
+
+function GestureIcon({ gesture }: { gesture: GestureType }) {
+  const cls = "w-5 h-5"
+  switch (gesture) {
+    case "Pinch": return <MousePointerClick className={`${cls} text-white animate-bounce`} />
+    case "TwoFingers": return <ArrowUpDown className={`${cls} text-cyan-400`} />
+    case "Fist": return <Keyboard className={`${cls} text-amber-400`} />
+    case "Peace": return <Copy className={`${cls} text-emerald-400`} />
+    case "ThumbsUp": return <ThumbsUp className={`${cls} text-violet-400`} />
+    default: return <Hand className={`${cls} text-[#6B9DFE]`} />
+  }
+}
 
 export default function CameraCanvas() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isReady, setIsReady] = useState(false)
-
-  // NEW: State to hold the current gesture for the UI
   const [currentGesture, setCurrentGesture] = useState<GestureType>("None")
+  const [fps, setFps] = useState(0)
+  const [latency, setLatency] = useState(0)
+  const fpsFrames = useRef(0)
+  const fpsLastTime = useRef(performance.now())
+
+  const updateFps = useCallback(() => {
+    fpsFrames.current++
+    const now = performance.now()
+    const delta = now - fpsLastTime.current
+    if (delta >= 1000) {
+      setFps(Math.round((fpsFrames.current * 1000) / delta))
+      fpsFrames.current = 0
+      fpsLastTime.current = now
+    }
+  }, [])
 
   useEffect(() => {
     let animationFrameId: number
 
     async function startSystem() {
-      if (isMobileDevice()) {
-        setIsReady(false)
-        return
-      }
-      // 1. Initialize the AI Model
+      if (isMobileDevice()) { setIsReady(false); return }
       await handTracker.initialize()
-
-      // 2. Request Camera Permission
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 640 }, // Changed from 1280 to 640
-            height: { ideal: 480 }, // Changed from 720 to 480
-            frameRate: { ideal: 30 }, // Capped at 30fps for stability
-          },
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } },
         })
         if (videoRef.current) {
           videoRef.current.srcObject = stream
-          // Wait for the video to actually start playing before we begin tracking
           videoRef.current.onloadedmetadata = () => {
             videoRef.current?.play()
             setIsReady(true)
-            renderLoop() // Start the 60fps tracking loop
+            renderLoop()
           }
         }
       } catch (error) {
@@ -49,66 +72,46 @@ export default function CameraCanvas() {
       }
     }
 
-    // 3. The 60fps Detection Loop
     let lastVideoTime = -1
     let drawingUtils: DrawingUtils | null = null
     let lastAiRunTime = 0
-    const AI_FPS_LIMIT = 1000 / 20 // Limit AI to 20 frames per second (50ms gaps)
+    const AI_FPS_LIMIT = 1000 / 20
 
     const renderLoop = (currentTime: number = performance.now()) => {
-      if (!videoRef.current || !canvasRef.current || !handTracker.isReady)
-        return
+      if (!videoRef.current || !canvasRef.current || !handTracker.isReady) return
 
       const video = videoRef.current
       const canvas = canvasRef.current
       const ctx = canvas.getContext("2d")
-
       if (!ctx) return
 
-      // Ensure canvas matches video size
       if (canvas.width !== video.videoWidth) {
         canvas.width = video.videoWidth
         canvas.height = video.videoHeight
       }
 
-      // Draw the mirrored video background (This runs fast at 60fps)
       ctx.clearRect(0, 0, canvas.width, canvas.height)
       ctx.save()
       ctx.scale(-1, 1)
       ctx.translate(-canvas.width, 0)
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-      // ONLY run the heavy AI math if enough time has passed AND there is a new frame
-      if (
-        currentTime - lastAiRunTime >= AI_FPS_LIMIT &&
-        video.currentTime !== lastVideoTime
-      ) {
+      if (currentTime - lastAiRunTime >= AI_FPS_LIMIT && video.currentTime !== lastVideoTime) {
         lastAiRunTime = currentTime
         lastVideoTime = video.currentTime
 
+        const t0 = performance.now()
         const results = handTracker.detect(video, performance.now())
+        const t1 = performance.now()
+        setLatency(Math.round(t1 - t0))
 
-        // Draw the skeleton
         if (results && results.landmarks.length > 0) {
           if (!drawingUtils) drawingUtils = new DrawingUtils(ctx)
-
           for (const landmarks of results.landmarks) {
-            drawingUtils.drawConnectors(
-              landmarks,
-              HandLandmarker.HAND_CONNECTIONS,
-              {
-                color: "#6B9DFE",
-                lineWidth: 5,
-              },
-            )
-            drawingUtils.drawLandmarks(landmarks, {
-              color: "#ffffff",
-              lineWidth: 2,
-              radius: 4,
-            })
-
-            // Detect Gesture
+            drawingUtils.drawConnectors(landmarks, HandLandmarker.HAND_CONNECTIONS, { color: "#6B9DFE", lineWidth: 5 })
+            drawingUtils.drawLandmarks(landmarks, { color: "#ffffff", lineWidth: 2, radius: 4 })
             const detected = gestureEngine.detectGesture(landmarks)
+            handTracker.lastGesture = detected
             setCurrentGesture((prev) => (prev !== detected ? detected : prev))
           }
         } else {
@@ -116,14 +119,11 @@ export default function CameraCanvas() {
         }
       }
       ctx.restore()
-
-      // Loop again on the next monitor refresh
+      updateFps()
       animationFrameId = requestAnimationFrame(renderLoop)
     }
 
     startSystem()
-
-    // Cleanup when leaving the page
     return () => {
       cancelAnimationFrame(animationFrameId)
       if (videoRef.current?.srcObject) {
@@ -131,25 +131,22 @@ export default function CameraCanvas() {
         stream.getTracks().forEach((track) => track.stop())
       }
     }
-  }, [])
+  }, [updateFps])
+
+  const gestureInfo = GESTURE_LABELS[currentGesture]
+  const isActive = currentGesture !== "None"
 
   return (
-    <div className="relative w-full h-[500px] lg:h-full min-h-[400px] bg-[#131823] border border-slate-800 rounded-2xl overflow-hidden flex flex-col justify-between p-6">
-      {/* Hidden Video Element (source for the canvas) */}
+    <div className="relative w-full h-[500px] lg:h-full min-h-[400px] bg-[#131823] border border-slate-800 rounded-2xl overflow-hidden flex flex-col justify-between p-5">
       <video ref={videoRef} playsInline muted className="hidden" />
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover z-0 rounded-2xl" />
 
-      {/* The visible Canvas (where we draw the video + hand skeleton) */}
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full object-cover z-0 rounded-2xl"
-      />
-
-      {/* Top HUD */}
+      {/* ── Top HUD ── */}
       <div className="flex justify-between items-start z-10 pointer-events-none">
         <div className="bg-[#0B0F17]/80 backdrop-blur-md border border-slate-700/50 rounded-full px-4 py-2 flex items-center gap-3 text-xs font-medium text-slate-300 shadow-lg">
           <span className="flex items-center gap-2">
             {isReady ? (
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]"></span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
             ) : (
               <Loader2 className="w-3 h-3 text-yellow-500 animate-spin" />
             )}
@@ -157,46 +154,53 @@ export default function CameraCanvas() {
           </span>
           {isReady && (
             <>
-              <span className="w-[1px] h-3 bg-slate-600"></span>
-              <span>FPS: 60</span>
+              <span className="w-[1px] h-3 bg-slate-600" />
+              <span className="font-mono">FPS: <span className="text-[#6b9dfe]">{fps}</span></span>
+              <span className="w-[1px] h-3 bg-slate-600" />
+              <span className="font-mono">LAT: <span className="text-cyan-400">{latency}ms</span></span>
             </>
           )}
         </div>
       </div>
 
-      {/* Bottom HUD: Dynamic Gesture Badge */}
-      <div className="flex justify-center z-10 pointer-events-none">
-        <div
-          className={`backdrop-blur-md border rounded-2xl p-4 flex items-center gap-4 text-sm font-medium shadow-xl transition-all duration-300 ${
-            currentGesture === "Pinch"
-              ? "bg-blue-900/40 border-blue-500 scale-105"
-              : "bg-[#0B0F17]/80 border-slate-700/50"
-          }`}
-        >
-          <div className="bg-[#131823] p-2 border border-slate-700 rounded-lg">
-            {currentGesture === "Pinch" ? (
-              <MousePointerClick className="w-6 h-6 text-white animate-bounce" />
-            ) : (
-              <Hand className="w-6 h-6 text-[#6B9DFE]" />
-            )}
+      {/* ── Bottom HUD: Dynamic Gesture Badge ── */}
+      <div className="flex flex-col gap-3 z-10 pointer-events-none">
+        <div className="flex justify-center">
+          <div className={`backdrop-blur-md border rounded-2xl p-3.5 flex items-center gap-3.5 text-sm font-medium shadow-xl transition-all duration-300 ${
+            currentGesture === "Fist"
+              ? "bg-amber-900/30 border-amber-500/50 scale-[1.02]"
+              : isActive ? "bg-blue-900/30 border-blue-500/50 scale-[1.02]" : "bg-[#0B0F17]/80 border-slate-700/50"
+          }`}>
+            <div className={`p-2 rounded-lg border transition-all duration-300 ${isActive ? "bg-blue-900/40 border-blue-600/40" : "bg-[#131823] border-slate-700"}`}>
+              <GestureIcon gesture={currentGesture} />
+            </div>
+            <div className="flex flex-col pr-3">
+              <span className="text-slate-400 text-[10px] uppercase tracking-wider">{isActive ? "Action Detected" : "System Ready"}</span>
+              <span className={`text-base tracking-tight ${isActive ? "text-white font-bold" : "text-slate-300"}`}>
+                {currentGesture === "Fist" ? "✊ Hold 1.5s → Keyboard" : gestureInfo.label}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col pr-4">
-            <span className="text-slate-400 text-[10px] uppercase tracking-wider">
-              {currentGesture !== "None" ? "Action Detected" : "System Ready"}
-            </span>
-            <span
-              className={`text-lg tracking-tight ${currentGesture === "Pinch" ? "text-white font-bold" : "text-white"}`}
-            >
-              {currentGesture === "Pinch"
-                ? "Click (Pinch)"
-                : "Move hand to test"}
-            </span>
+        </div>
+
+        {/* ── Footer Bar: Engine + Privacy ── */}
+        <div className="flex justify-between items-center px-1">
+          <div className="flex items-center gap-2 bg-[#0B0F17]/60 backdrop-blur-sm border border-slate-800/50 rounded-lg px-3 py-1.5">
+            <Cpu className="w-3 h-3 text-[#6b9dfe]" />
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Neural Engine v1.0</span>
+          </div>
+          <div className="flex items-center gap-2 bg-[#0B0F17]/60 backdrop-blur-sm border border-emerald-900/30 rounded-lg px-3 py-1.5">
+            <ShieldCheck className="w-3 h-3 text-emerald-500" />
+            <span className="text-[10px] font-bold text-emerald-500/80 uppercase tracking-wider">Privacy: Local-Only</span>
           </div>
         </div>
       </div>
 
-      <div className="absolute bottom-6 left-6 w-8 h-8 border-b-2 border-l-2 border-slate-700 rounded-bl-lg z-10 pointer-events-none"></div>
-      <div className="absolute top-6 right-6 w-8 h-8 border-t-2 border-r-2 border-slate-700 rounded-tr-lg z-10 pointer-events-none"></div>
+      {/* Corner brackets */}
+      <div className="absolute bottom-5 left-5 w-8 h-8 border-b-2 border-l-2 border-slate-700/60 rounded-bl-lg z-10 pointer-events-none" />
+      <div className="absolute top-5 right-5 w-8 h-8 border-t-2 border-r-2 border-slate-700/60 rounded-tr-lg z-10 pointer-events-none" />
+      <div className="absolute top-5 left-5 w-8 h-8 border-t-2 border-l-2 border-slate-700/60 rounded-tl-lg z-10 pointer-events-none" />
+      <div className="absolute bottom-5 right-5 w-8 h-8 border-b-2 border-r-2 border-slate-700/60 rounded-br-lg z-10 pointer-events-none" />
     </div>
   )
 }

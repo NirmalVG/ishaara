@@ -1,4 +1,5 @@
 import { FilesetResolver, HandLandmarker } from "@mediapipe/tasks-vision"
+import { GestureType } from "./gestureEngine"
 
 class HandTrackingEngine {
   private landmarker: HandLandmarker | null = null
@@ -6,6 +7,7 @@ class HandTrackingEngine {
 
   // 1. The memory variable to hold the last frame's data
   private lastResults: any = null
+  public lastGesture: GestureType = "None"
 
   async initialize() {
     if (this.isReady) return
