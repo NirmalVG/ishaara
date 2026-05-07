@@ -1,3 +1,5 @@
+import type { NormalizedLandmark } from "@mediapipe/tasks-vision"
+
 export type GestureType =
   | "None"
   | "Pinch"
@@ -19,7 +21,7 @@ export class GestureEngine {
     return Math.sqrt(Math.pow(p2.x - p1.x, 2) + Math.pow(p2.y - p1.y, 2))
   }
 
-  public detectGesture(landmarks: any[]): GestureType {
+  public detectGesture(landmarks: NormalizedLandmark[]): GestureType {
     if (!landmarks || landmarks.length < 21) return "None"
 
     const wrist = landmarks[0]

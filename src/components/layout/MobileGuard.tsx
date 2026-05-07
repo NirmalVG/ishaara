@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react"
 import { Monitor } from "lucide-react"
 
+function isMobileViewport() {
+  return (
+    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    window.innerWidth < 1024
+  )
+}
+
 export default function MobileGuard({
   children,
 }: {
@@ -11,10 +18,7 @@ export default function MobileGuard({
   const [isMobile, setIsMobile] = useState<boolean | null>(null)
 
   useEffect(() => {
-    const mobile =
-      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-      window.innerWidth < 1024
-    setIsMobile(mobile)
+    queueMicrotask(() => setIsMobile(isMobileViewport()))
   }, [])
 
   // Render nothing during SSR / before useEffect fires
