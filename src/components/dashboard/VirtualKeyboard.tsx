@@ -20,6 +20,7 @@ import {
   pressEnterAtCursor,
   preventFocusTheft,
   getActiveValue,
+  setTypingTarget,
 } from "@/lib/keyboardDispatch"
 
 /* ═══════════════════════════════════════════════════════════════════════════════
@@ -170,8 +171,9 @@ export default function VirtualKeyboard() {
   const [preview, setPreview] = useState("")
   const [lastKey, setLastKey] = useState<string | null>(null)
   const previewIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const builtInInputRef = useRef<HTMLInputElement>(null)
 
-  // Poll the active input's value for the live preview bar
+  // Auto-focus the built-in input when keyboard opens so there's always a target
   useEffect(() => {
     if (!isOpen) {
       if (previewIntervalRef.current) {
@@ -180,10 +182,26 @@ export default function VirtualKeyboard() {
       }
       return
     }
+
+    // Register the built-in input as the typing target if nothing else is focused
+    const timer = setTimeout(() => {
+      const currentActive = document.activeElement
+      const hasExternalTarget =
+        currentActive instanceof HTMLInputElement ||
+        currentActive instanceof HTMLTextAreaElement
+      if (!hasExternalTarget && builtInInputRef.current) {
+        builtInInputRef.current.focus()
+        setTypingTarget(builtInInputRef.current)
+      }
+    }, 50)
+
+    // Poll the active input's value for the live preview bar
     previewIntervalRef.current = setInterval(() => {
       setPreview(getActiveValue())
-    }, 120)
+    }, 100)
+
     return () => {
+      clearTimeout(timer)
       if (previewIntervalRef.current) clearInterval(previewIntervalRef.current)
     }
   }, [isOpen])
@@ -289,17 +307,21 @@ export default function VirtualKeyboard() {
 
             <div className="h-4 w-[1px] bg-white/[0.06]" />
 
-            {/* Live preview */}
-            <div className="flex-1 min-w-0 bg-white/[0.03] border border-white/[0.05] rounded-lg px-3 py-1.5 flex items-center gap-2">
-              <span className="text-xs text-slate-500 font-mono truncate max-w-[300px]">
-                {preview || (
-                  <span className="text-slate-600 italic">
-                    Focus an input to start typing...
-                  </span>
-                )}
-              </span>
+            {/* Built-in input — always available as a typing target */}
+            <div className="flex-1 min-w-0 bg-white/[0.03] border border-white/[0.05] rounded-lg px-3 py-1.5 flex items-center gap-1 focus-within:border-[#6b9dfe]/30 focus-within:bg-white/[0.05] transition-all">
+              <input
+                ref={builtInInputRef}
+                type="text"
+                className="flex-1 bg-transparent text-xs text-slate-200 font-mono outline-none placeholder:text-slate-600 placeholder:italic min-w-0"
+                placeholder="Type here or focus any input..."
+                onFocus={() => {
+                  if (builtInInputRef.current) {
+                    setTypingTarget(builtInInputRef.current)
+                  }
+                }}
+              />
               <span
-                className="w-[2px] h-3.5 bg-[#6b9dfe] rounded-full"
+                className="w-[2px] h-3.5 bg-[#6b9dfe] rounded-full shrink-0"
                 style={{ animation: "cursor-blink 1s step-end infinite" }}
               />
             </div>

@@ -88,7 +88,7 @@ export default function VirtualCursor() {
           simulateClick(lockedPosRef.current.x, lockedPosRef.current.y)
         }
 
-        const aiLerp = isPinching ? 1 : 0.15 * fpsMultiplier
+        const aiLerp = isPinching ? 1 : 0.25 * fpsMultiplier
         smoothedAiRef.current.x += (rawFocusX - smoothedAiRef.current.x) * aiLerp
         smoothedAiRef.current.y += (rawFocusY - smoothedAiRef.current.y) * aiLerp
 
@@ -104,10 +104,10 @@ export default function VirtualCursor() {
         const dx = targetX - currentPhysicsPos.current.x
         const dy = targetY - currentPhysicsPos.current.y
         const distanceToTarget = Math.sqrt(dx * dx + dy * dy)
-        const minLerp = (1 - cursorSmoothing) * 0.08
-        const normalizedDist = Math.min(distanceToTarget / 1200, 1)
-        const speedBoost = Math.pow(normalizedDist, 2) * 0.6
-        let activeLerp = Math.min(minLerp + speedBoost, 1) * fpsMultiplier
+        const minLerp = (1 - cursorSmoothing) * 0.22
+        const normalizedDist = Math.min(distanceToTarget / 600, 1)
+        const speedBoost = Math.pow(normalizedDist, 1.5) * 0.5
+        let activeLerp = Math.min(minLerp + speedBoost, 0.95) * fpsMultiplier
         if (isPinching) activeLerp = 1
 
         currentPhysicsPos.current.x += dx * activeLerp

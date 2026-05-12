@@ -97,7 +97,15 @@ class HandTrackingEngine {
 
   detect(videoElement: HTMLVideoElement, timestamp: number) {
     if (!this.landmarker || !this.isReady) return null;
-    this.lastResults = this.landmarker.detectForVideo(videoElement, timestamp);
+    // Guard: MediaPipe crashes with "ROI width and height must be > 0" if the
+    // video element has no decoded frames yet (dimensions are 0 during warmup).
+    if (videoElement.videoWidth === 0 || videoElement.videoHeight === 0) return null;
+    try {
+      this.lastResults = this.landmarker.detectForVideo(videoElement, timestamp);
+    } catch {
+      // Swallow transient MediaPipe graph errors (e.g. during tab switch / resize)
+      return this.lastResults;
+    }
     return this.lastResults;
   }
 

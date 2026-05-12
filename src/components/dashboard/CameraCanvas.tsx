@@ -148,7 +148,9 @@ export default function CameraCanvas() {
 
       if (
         currentTime - lastAiRunTime >= AI_FPS_LIMIT &&
-        video.currentTime !== lastVideoTime
+        video.currentTime !== lastVideoTime &&
+        video.videoWidth > 0 &&
+        video.videoHeight > 0
       ) {
         lastAiRunTime = currentTime;
         lastVideoTime = video.currentTime;
