@@ -2,12 +2,12 @@ import {
   FilesetResolver,
   HandLandmarker,
   type HandLandmarkerResult,
-} from "@mediapipe/tasks-vision"
-import type { GestureType } from "./gestureEngine"
+} from "@mediapipe/tasks-vision";
+import type { GestureType } from "./gestureEngine";
 
-const XNNPACK_INFO_MESSAGE = "Created TensorFlow Lite XNNPACK delegate for CPU"
+const XNNPACK_INFO_MESSAGE = "Created TensorFlow Lite XNNPACK delegate for CPU";
 
-type ConsoleMethod = (...data: unknown[]) => void
+type ConsoleMethod = (...data: unknown[]) => void;
 
 function suppressTensorFlowDelegateInfo<T>(task: () => Promise<T>) {
   const original = {
@@ -15,7 +15,7 @@ function suppressTensorFlowDelegateInfo<T>(task: () => Promise<T>) {
     info: console.info.bind(console),
     log: console.log.bind(console),
     warn: console.warn.bind(console),
-  }
+  };
 
   const filter =
     (method: ConsoleMethod): ConsoleMethod =>
@@ -26,23 +26,23 @@ function suppressTensorFlowDelegateInfo<T>(task: () => Promise<T>) {
             typeof item === "string" && item.includes(XNNPACK_INFO_MESSAGE),
         )
       ) {
-        return
+        return;
       }
 
-      method(...data)
-    }
+      method(...data);
+    };
 
-  console.error = filter(original.error) as typeof console.error
-  console.info = filter(original.info) as typeof console.info
-  console.log = filter(original.log) as typeof console.log
-  console.warn = filter(original.warn) as typeof console.warn
+  console.error = filter(original.error) as typeof console.error;
+  console.info = filter(original.info) as typeof console.info;
+  console.log = filter(original.log) as typeof console.log;
+  console.warn = filter(original.warn) as typeof console.warn;
 
   return task().finally(() => {
-    console.error = original.error as typeof console.error
-    console.info = original.info as typeof console.info
-    console.log = original.log as typeof console.log
-    console.warn = original.warn as typeof console.warn
-  })
+    console.error = original.error as typeof console.error;
+    console.info = original.info as typeof console.info;
+    console.log = original.log as typeof console.log;
+    console.warn = original.warn as typeof console.warn;
+  });
 }
 
 /**
@@ -60,20 +60,20 @@ function suppressTensorFlowDelegateInfo<T>(task: () => Promise<T>) {
  *   CameraCanvas badge reads ← handTracker.lastDetectedGesture
  */
 class HandTrackingEngine {
-  private landmarker: HandLandmarker | null = null
-  public isReady = false
-  private lastResults: HandLandmarkerResult | null = null
+  private landmarker: HandLandmarker | null = null;
+  public isReady = false;
+  private lastResults: HandLandmarkerResult | null = null;
 
   // Written by VirtualCursor after each gesture computation
-  public lastDetectedGesture: GestureType = "None"
+  public lastDetectedGesture: GestureType = "None";
 
   async initialize() {
-    if (this.isReady) return
+    if (this.isReady) return;
 
     try {
       const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm",
-      )
+      );
 
       this.landmarker = await suppressTensorFlowDelegateInfo(() =>
         HandLandmarker.createFromOptions(vision, {
@@ -87,23 +87,23 @@ class HandTrackingEngine {
           minHandPresenceConfidence: 0.5,
           minTrackingConfidence: 0.5,
         }),
-      )
+      );
 
-      this.isReady = true
+      this.isReady = true;
     } catch (error) {
-      console.error("❌ Failed to initialize MediaPipe:", error)
+      console.error("❌ Failed to initialize MediaPipe:", error);
     }
   }
 
   detect(videoElement: HTMLVideoElement, timestamp: number) {
-    if (!this.landmarker || !this.isReady) return null
-    this.lastResults = this.landmarker.detectForVideo(videoElement, timestamp)
-    return this.lastResults
+    if (!this.landmarker || !this.isReady) return null;
+    this.lastResults = this.landmarker.detectForVideo(videoElement, timestamp);
+    return this.lastResults;
   }
 
   getLastKnownResults() {
-    return this.lastResults
+    return this.lastResults;
   }
 }
 
-export const handTracker = new HandTrackingEngine()
+export const handTracker = new HandTrackingEngine();

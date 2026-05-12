@@ -1,574 +1,494 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import {
+  X,
+  Delete,
+  CornerDownLeft,
+  Space,
+  ChevronUp,
+  Globe,
+  ArrowBigUp,
+  Lock,
+  Hash,
+  Keyboard as KeyboardIcon,
+} from "lucide-react"
 import { useKeyboardStore } from "@/store/useKeyboardStore"
 import {
   insertAtCursor,
   deleteAtCursor,
   pressEnterAtCursor,
-  getActiveValue,
   preventFocusTheft,
+  getActiveValue,
 } from "@/lib/keyboardDispatch"
-import {
-  Delete,
-  X,
-  CornerDownLeft,
-  Space,
-  Keyboard,
-  ArrowBigUp,
-  Lock,
-  ChevronRight,
-} from "lucide-react"
 
-// ─── Layout data ─────────────────────────────────────────────────────────────
-
-const NUMBERS_ROW = [
-  { base: "1", shift: "!" },
-  { base: "2", shift: "@" },
-  { base: "3", shift: "#" },
-  { base: "4", shift: "$" },
-  { base: "5", shift: "%" },
-  { base: "6", shift: "^" },
-  { base: "7", shift: "&" },
-  { base: "8", shift: "*" },
-  { base: "9", shift: "(" },
-  { base: "0", shift: ")" },
-]
+/* ═══════════════════════════════════════════════════════════════════════════════
+   LAYOUT DEFINITIONS
+   ═══════════════════════════════════════════════════════════════════════════════ */
 
 const QWERTY_ROWS = [
-  ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
-  ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
-  ["Z", "X", "C", "V", "B", "N", "M"],
+  ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
+  ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
+  ["z", "x", "c", "v", "b", "n", "m"],
 ]
 
-// Page 1: everyday punctuation, operators, brackets
-const SYM_PAGE1: string[][] = [
-  ["!", "@", "#", "$", "%", "^", "&", "*", "(", ")"],
-  ["-", "+", "=", "/", "\\", "|", "<", ">", "?", "_"],
-  ["~", "`", "'", '"', ";", ":", ",", ".", "[", "]"],
+const SYMBOLS_PAGE1 = [
+  ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"],
+  ["-", "/", ":", ";", "(", ")", "$", "&", "@", "\""],
+  [".", ",", "?", "!", "'", "#", "%", "^"],
 ]
 
-// Page 2: currency, extended typography, arrows
-const SYM_PAGE2: string[][] = [
-  ["€", "£", "¥", "©", "®", "™", "°", "±", "×", "÷"],
-  ["¿", "¡", "«", "»", "\u201C", "\u201D", "\u201E", "…", "–", "—"],
-  ["{", "}", "§", "¶", "†", "‡", "•", "·", "←", "→"],
+const SYMBOLS_PAGE2 = [
+  ["[", "]", "{", "}", "#", "%", "^", "*", "+", "="],
+  ["_", "\\", "|", "~", "<", ">", "€", "£", "¥", "•"],
+  [".", ",", "?", "!", "'", "&", "@", "°"],
 ]
 
-// ─── Audio ───────────────────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════════════════
+   KEY COMPONENT — Individual key with ripple effect + glassmorphism
+   ═══════════════════════════════════════════════════════════════════════════════ */
 
-let audioCtx: AudioContext | null = null
-
-function playKeySound(
-  type: "char" | "space" | "delete" | "modifier" | "enter",
-) {
-  const freqs: Record<string, number> = {
-    char: 660,
-    space: 300,
-    delete: 200,
-    modifier: 500,
-    enter: 440,
-  }
-  try {
-    if (!audioCtx) audioCtx = new AudioContext()
-    const o = audioCtx.createOscillator()
-    const g = audioCtx.createGain()
-    o.connect(g)
-    g.connect(audioCtx.destination)
-    o.frequency.value = freqs[type]
-    o.type = type === "modifier" ? "triangle" : "sine"
-    g.gain.setValueAtTime(0.05, audioCtx.currentTime)
-    g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.03)
-    o.start(audioCtx.currentTime)
-    o.stop(audioCtx.currentTime + 0.03)
-  } catch {
-    /* AudioContext blocked — silent degradation */
-  }
+interface KeyProps {
+  label: string
+  display?: React.ReactNode
+  onPress: () => void
+  className?: string
+  /** Flex grow factor (1 = normal, 1.5 = wider, etc.) */
+  flex?: number
+  /** Stagger animation delay in ms */
+  delay?: number
+  /** Active/toggled state for shift/caps/symbols */
+  active?: boolean
+  /** Accent color variant */
+  variant?: "default" | "action" | "primary" | "danger"
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-/**
- * CharKey — standard character button.
- *
- * CRITICAL: onMouseDown={preventFocusTheft}
- * Without this, clicking the button fires mousedown first, which moves
- * browser focus from the active input to this button. By the time onClick
- * fires, document.activeElement is the button — not the input —
- * so getTarget() would return null and nothing would be inserted.
- *
- * preventDefault() on mousedown stops the focus-move while still
- * allowing the click event to fire normally.
- */
-function CharKey({
+function Key({
+  label,
   display,
-  subLabel,
-  onClick,
-  style,
-}: {
-  display: string
-  subLabel?: string
-  onClick: () => void
-  style?: React.CSSProperties
-}) {
+  onPress,
+  className = "",
+  flex = 1,
+  delay = 0,
+  active = false,
+  variant = "default",
+}: KeyProps) {
+  const keyRef = useRef<HTMLButtonElement>(null)
+
+  const handleClick = useCallback(() => {
+    onPress()
+
+    // Spawn ripple
+    const btn = keyRef.current
+    if (!btn) return
+    const ripple = document.createElement("span")
+    ripple.className = "ripple"
+    const rect = btn.getBoundingClientRect()
+    const size = Math.max(rect.width, rect.height) * 1.2
+    ripple.style.width = ripple.style.height = `${size}px`
+    ripple.style.left = `${rect.width / 2 - size / 2}px`
+    ripple.style.top = `${rect.height / 2 - size / 2}px`
+    btn.appendChild(ripple)
+    ripple.addEventListener("animationend", () => ripple.remove())
+  }, [onPress])
+
+  const variantClasses = {
+    default: `
+      bg-white/[0.06] border-white/[0.08] text-slate-200
+      hover:bg-white/[0.12] hover:border-white/[0.15] hover:text-white
+      hover:shadow-[0_0_20px_rgba(107,157,254,0.15)]
+      active:bg-white/[0.18]
+    `,
+    action: `
+      bg-slate-500/[0.15] border-slate-400/[0.12] text-slate-300
+      hover:bg-slate-400/[0.2] hover:border-slate-400/[0.2] hover:text-white
+      hover:shadow-[0_0_15px_rgba(148,163,184,0.15)]
+      active:bg-slate-400/[0.25]
+    `,
+    primary: `
+      bg-[#6b9dfe]/20 border-[#6b9dfe]/30 text-[#8bb4ff]
+      hover:bg-[#6b9dfe]/30 hover:border-[#6b9dfe]/40 hover:text-white
+      hover:shadow-[0_0_25px_rgba(107,157,254,0.3)]
+      active:bg-[#6b9dfe]/40
+    `,
+    danger: `
+      bg-rose-500/[0.12] border-rose-500/[0.15] text-rose-400
+      hover:bg-rose-500/[0.2] hover:border-rose-500/[0.25] hover:text-rose-300
+      hover:shadow-[0_0_20px_rgba(244,63,94,0.2)]
+      active:bg-rose-500/[0.3]
+    `,
+  }
+
   return (
     <button
+      ref={keyRef}
+      type="button"
+      aria-label={label}
       onMouseDown={preventFocusTheft}
-      onClick={onClick}
-      aria-label={display}
-      style={style}
-      className="
-        kb-key relative flex-1 max-w-[72px] h-12 md:h-14
-        bg-slate-800/40 hover:bg-[#6b9dfe]/20 active:scale-95 active:bg-[#6b9dfe]/30
-        text-base md:text-lg font-semibold rounded-xl
-        border border-slate-700/30 hover:border-[#6b9dfe]/40
-        text-slate-200 hover:text-white
-        flex flex-col items-center justify-center
-        shadow-sm transition-all duration-100 select-none
-      "
+      onClick={handleClick}
+      className={`
+        kb-key relative overflow-hidden
+        backdrop-blur-xl border rounded-xl
+        font-medium select-none cursor-pointer
+        transition-all duration-150 ease-out
+        ${variantClasses[variant]}
+        ${active ? "!bg-[#6b9dfe]/25 !border-[#6b9dfe]/40 !text-[#8bb4ff] shadow-[0_0_20px_rgba(107,157,254,0.25)]" : ""}
+        ${className}
+      `}
+      style={{
+        flex,
+        minHeight: 48,
+        animationDelay: `${delay}ms`,
+        animation: "key-stagger-in 0.3s cubic-bezier(0.23, 1, 0.32, 1) backwards",
+      }}
     >
-      <span className="leading-none">{display}</span>
-      {subLabel && (
-        <span className="text-[9px] text-slate-500 leading-none mt-0.5 font-normal">
-          {subLabel}
+      {display ?? (
+        <span className="text-[15px] tracking-wide pointer-events-none relative z-10">
+          {label}
         </span>
       )}
     </button>
   )
 }
 
-/**
- * ModKey — modifier button (Shift, CapsLock, symbols toggle).
- * Also requires onMouseDown={preventFocusTheft} for the same reason.
- */
-function ModKey({
-  children,
-  onClick,
-  isActive,
-  isCaps,
-  ariaLabel,
-  wide,
-  danger,
-}: {
-  children: React.ReactNode
-  onClick: () => void
-  isActive: boolean
-  isCaps?: boolean
-  ariaLabel: string
-  wide?: boolean
-  danger?: boolean
-}) {
-  return (
-    <button
-      onMouseDown={preventFocusTheft}
-      onClick={onClick}
-      aria-label={ariaLabel}
-      aria-pressed={isActive}
-      className={`
-        kb-key h-12 md:h-14 rounded-xl flex items-center justify-center gap-1
-        border transition-all duration-150 active:scale-95 font-bold text-xs select-none
-        ${wide ? "w-16 md:w-20" : "w-12 md:w-14"}
-        ${
-          danger
-            ? "bg-red-950/30 hover:bg-red-900/50 text-red-400 hover:text-red-300 border-red-900/30 hover:border-red-700/50"
-            : isCaps
-              ? "bg-violet-900/40 border-violet-500/60 text-violet-300 shadow-[0_0_15px_rgba(167,139,250,0.3)]"
-              : isActive
-                ? "bg-[#6b9dfe]/30 border-[#6b9dfe]/60 text-[#6b9dfe] shadow-[0_0_15px_rgba(107,157,254,0.3)]"
-                : "bg-slate-800/40 border-slate-700/30 text-slate-400 hover:bg-slate-700/60 hover:text-slate-200"
-        }
-      `}
-    >
-      {children}
-    </button>
-  )
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════════════════
+   VIRTUAL KEYBOARD — Main Component
+   ═══════════════════════════════════════════════════════════════════════════════ */
 
 export default function VirtualKeyboard() {
-  const {
-    isOpen,
-    isShiftActive,
-    isCapsLock,
-    isSymbolsMode,
-    isSymbolsPage2,
-    close,
-    tapShift,
-    toggleCapsLock,
-    releaseShift,
-    toggleSymbols,
-    toggleSymbolsPage,
-  } = useKeyboardStore()
+  const isOpen = useKeyboardStore((s) => s.isOpen)
+  const isShiftActive = useKeyboardStore((s) => s.isShiftActive)
+  const isCapsLock = useKeyboardStore((s) => s.isCapsLock)
+  const isSymbolsMode = useKeyboardStore((s) => s.isSymbolsMode)
+  const isSymbolsPage2 = useKeyboardStore((s) => s.isSymbolsPage2)
+  const close = useKeyboardStore((s) => s.close)
+  const tapShift = useKeyboardStore((s) => s.tapShift)
+  const toggleSymbols = useKeyboardStore((s) => s.toggleSymbols)
+  const toggleSymbolsPage = useKeyboardStore((s) => s.toggleSymbolsPage)
+  const releaseShift = useKeyboardStore((s) => s.releaseShift)
 
-  const isUpperCase = isShiftActive || isCapsLock
+  const [preview, setPreview] = useState("")
+  const [lastKey, setLastKey] = useState<string | null>(null)
+  const previewIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // ── Live preview ─────────────────────────────────────────────────────────
-  // Reads from our lastFocusedElement tracker (in keyboardDispatch), NOT from
-  // document.activeElement. This works correctly even while a button has focus.
-  const [previewText, setPreviewText] = useState("")
-
+  // Poll the active input's value for the live preview bar
   useEffect(() => {
-    if (!isOpen) return
-    setPreviewText(getActiveValue())
-    const id = setInterval(() => setPreviewText(getActiveValue()), 80)
-    return () => clearInterval(id)
+    if (!isOpen) {
+      if (previewIntervalRef.current) {
+        clearInterval(previewIntervalRef.current)
+        previewIntervalRef.current = null
+      }
+      return
+    }
+    previewIntervalRef.current = setInterval(() => {
+      setPreview(getActiveValue())
+    }, 120)
+    return () => {
+      if (previewIntervalRef.current) clearInterval(previewIntervalRef.current)
+    }
   }, [isOpen])
 
-  // ── Insert handler ────────────────────────────────────────────────────────
-  const handleChar = useCallback(
-    (rawKey: string) => {
-      const isLetter = /^[A-Za-z]$/.test(rawKey)
-      const char = isLetter
-        ? isUpperCase
-          ? rawKey.toUpperCase()
-          : rawKey.toLowerCase()
-        : rawKey
-
-      insertAtCursor(char)
-      setPreviewText(getActiveValue())
-
-      // One-shot shift releases after each character; CapsLock stays on
-      if (isShiftActive) releaseShift()
-    },
-    [isUpperCase, isShiftActive, releaseShift],
-  )
-
-  const handleNumberKey = useCallback(
-    (base: string, shift: string) => {
-      // In letters mode: shift/caps makes number row show symbols
-      // In numbers themselves — no case logic needed; symbols are explicit
-      const char = isUpperCase ? shift : base
-      insertAtCursor(char)
-      setPreviewText(getActiveValue())
-      if (isShiftActive) releaseShift()
-    },
-    [isUpperCase, isShiftActive, releaseShift],
-  )
-
-  const handleDelete = useCallback(() => {
-    playKeySound("delete")
-    deleteAtCursor()
-    setPreviewText(getActiveValue())
+  // Flash last key pressed for visual feedback
+  const flashKey = useCallback((key: string) => {
+    setLastKey(key)
+    setTimeout(() => setLastKey(null), 400)
   }, [])
 
-  const handleClose = useCallback(() => {
-    playKeySound("modifier")
-    close()
-  }, [close])
+  const handleChar = useCallback(
+    (char: string) => {
+      const shouldUpper = isShiftActive || isCapsLock
+      const finalChar = shouldUpper ? char.toUpperCase() : char.toLowerCase()
+      insertAtCursor(finalChar)
+      releaseShift()
+      flashKey(char)
+    },
+    [isShiftActive, isCapsLock, releaseShift, flashKey],
+  )
+
+  const handleBackspace = useCallback(() => {
+    deleteAtCursor()
+    flashKey("⌫")
+  }, [flashKey])
+
+  const handleEnter = useCallback(() => {
+    pressEnterAtCursor()
+    flashKey("↵")
+  }, [flashKey])
+
+  const handleSpace = useCallback(() => {
+    insertAtCursor(" ")
+    releaseShift()
+    flashKey("␣")
+  }, [releaseShift, flashKey])
 
   if (!isOpen) return null
 
-  const symRows = isSymbolsPage2 ? SYM_PAGE2 : SYM_PAGE1
+  const shouldUpper = isShiftActive || isCapsLock
+
+  // Pick the right layout based on mode
+  const rows = isSymbolsMode
+    ? isSymbolsPage2
+      ? SYMBOLS_PAGE2
+      : SYMBOLS_PAGE1
+    : QWERTY_ROWS
+
+  let keyIndex = 0
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-[9000] flex justify-center px-2 pb-3 pt-2"
-      style={{
-        animation: "slide-up-enter 0.35s cubic-bezier(0.16,1,0.3,1) forwards",
-      }}
+      className="fixed inset-x-0 bottom-0 z-[9998] flex justify-center pointer-events-none"
       role="dialog"
       aria-label="Virtual Keyboard"
-      aria-modal="false"
     >
-      <div className="relative w-full max-w-5xl bg-[#0d1420]/95 backdrop-blur-xl rounded-2xl border border-slate-700/40 shadow-[0_-8px_60px_rgba(0,0,0,0.7),0_0_40px_rgba(107,157,254,0.08)] overflow-hidden">
-        {/* Top glow */}
+      <div
+        className="
+          pointer-events-auto w-full max-w-[780px] mx-4 mb-4
+          bg-[#0c1220]/70 backdrop-blur-2xl
+          border border-white/[0.08]
+          rounded-3xl overflow-hidden
+          shadow-[0_-8px_60px_rgba(0,0,0,0.5),0_0_80px_rgba(107,157,254,0.08)]
+          relative
+        "
+        style={{
+          animation:
+            "slide-up-enter 0.35s cubic-bezier(0.23, 1, 0.32, 1) forwards",
+        }}
+      >
+        {/* ── Holographic top edge glow ── */}
         <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#6b9dfe]/50 to-transparent" />
+        <div className="absolute top-0 left-1/4 right-1/4 h-[2px] bg-gradient-to-r from-transparent via-[#6b9dfe]/30 to-transparent blur-sm" />
 
-        <div className="relative z-10 p-3 md:p-4 flex flex-col gap-2">
-          {/* ── Top bar ── */}
-          <div className="flex items-center gap-2">
-            {/* Status */}
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 bg-[#0B0F17]/60 rounded-lg border border-slate-800/50 shrink-0">
-              <Keyboard className="w-3.5 h-3.5 text-[#6b9dfe]" />
-              <span className="text-[10px] font-bold text-[#6b9dfe] uppercase tracking-widest">
-                Ishaara KB
-              </span>
-              <span className="relative flex h-1.5 w-1.5 ml-0.5">
-                <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+        {/* ── Ambient corner glows ── */}
+        <div className="absolute -top-10 -left-10 w-40 h-40 bg-[#6b9dfe]/[0.04] rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#22d3ee]/[0.03] rounded-full blur-3xl pointer-events-none" />
+
+        {/* ── Scanline overlay ── */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-[0.015] z-[1]"
+          style={{
+            backgroundImage: `repeating-linear-gradient(
+              0deg,
+              transparent,
+              transparent 2px,
+              rgba(107, 157, 254, 0.3) 2px,
+              rgba(107, 157, 254, 0.3) 4px
+            )`,
+          }}
+        />
+
+        {/* ════════════ HEADER BAR ════════════ */}
+        <div className="relative z-10 flex items-center justify-between px-4 pt-3 pb-2">
+          {/* Preview / status */}
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <KeyboardIcon className="w-3.5 h-3.5 text-[#6b9dfe]" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
+                Ishaara
               </span>
             </div>
 
-            {/* Modifier badges */}
-            {isCapsLock && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-violet-900/30 border border-violet-700/40 rounded-md shrink-0">
-                <Lock className="w-3 h-3 text-violet-400" />
-                <span className="text-[9px] font-bold text-violet-400 uppercase tracking-wider">
-                  CAPS
-                </span>
-              </div>
-            )}
-            {isShiftActive && !isCapsLock && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-blue-900/30 border border-blue-700/40 rounded-md shrink-0">
-                <ArrowBigUp className="w-3 h-3 text-[#6b9dfe]" />
-                <span className="text-[9px] font-bold text-[#6b9dfe] uppercase tracking-wider">
-                  SHIFT
-                </span>
-              </div>
-            )}
-            {isSymbolsMode && (
-              <div className="flex items-center gap-1 px-2 py-1 bg-amber-900/30 border border-amber-700/40 rounded-md shrink-0">
-                <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider">
-                  SYM {isSymbolsPage2 ? "P2" : "P1"}
-                </span>
-              </div>
-            )}
+            <div className="h-4 w-[1px] bg-white/[0.06]" />
 
-            {/* Preview */}
-            <div className="flex-1 flex items-center bg-[#060a12] border border-slate-800/60 rounded-xl px-3 py-2 min-h-[40px] shadow-inner overflow-hidden">
-              <span className="flex-1 font-mono text-emerald-400 text-sm break-all tracking-wide truncate">
-                {previewText ? (
-                  previewText
-                ) : (
-                  <span className="text-slate-600 italic text-xs font-sans">
-                    Click or focus an input, then type...
+            {/* Live preview */}
+            <div className="flex-1 min-w-0 bg-white/[0.03] border border-white/[0.05] rounded-lg px-3 py-1.5 flex items-center gap-2">
+              <span className="text-xs text-slate-500 font-mono truncate max-w-[300px]">
+                {preview || (
+                  <span className="text-slate-600 italic">
+                    Focus an input to start typing...
                   </span>
                 )}
-                <span
-                  className="inline-block w-[2px] h-4 bg-[#6b9dfe] ml-0.5 align-middle rounded-full"
-                  style={{ animation: "cursor-blink 1s step-end infinite" }}
-                />
               </span>
+              <span
+                className="w-[2px] h-3.5 bg-[#6b9dfe] rounded-full"
+                style={{ animation: "cursor-blink 1s step-end infinite" }}
+              />
             </div>
+          </div>
 
-            {/* Close — uses onMouseDown too so close doesn't flicker */}
+          {/* Mode indicators + close */}
+          <div className="flex items-center gap-2 ml-3">
+            {isCapsLock && (
+              <div className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/20 rounded-lg px-2 py-1">
+                <Lock className="w-3 h-3 text-amber-400" />
+                <span className="text-[9px] font-bold text-amber-400 uppercase tracking-wider">
+                  Caps
+                </span>
+              </div>
+            )}
+
+            {lastKey && (
+              <div
+                className="bg-[#6b9dfe]/15 border border-[#6b9dfe]/25 rounded-lg px-2.5 py-1 text-[11px] font-bold text-[#8bb4ff] tracking-wide"
+                style={{ animation: "fade-in 0.1s ease" }}
+              >
+                {lastKey}
+              </div>
+            )}
+
             <button
+              type="button"
+              onClick={close}
               onMouseDown={preventFocusTheft}
-              onClick={handleClose}
+              className="
+                p-2 rounded-xl
+                bg-white/[0.04] border border-white/[0.06]
+                hover:bg-rose-500/15 hover:border-rose-500/25
+                text-slate-500 hover:text-rose-400
+                transition-all duration-200
+              "
               aria-label="Close keyboard"
-              className="p-2.5 bg-red-950/30 hover:bg-red-900/50 text-red-400 hover:text-red-300 rounded-xl border border-red-900/30 hover:border-red-700/50 transition-all shrink-0"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
+        </div>
 
-          {/* ── Numbers row (letters mode) ── */}
-          {!isSymbolsMode && (
-            <div className="flex gap-1 w-full justify-center">
-              {NUMBERS_ROW.map(({ base, shift }, i) => (
-                <CharKey
-                  key={base}
-                  display={isUpperCase ? shift : base}
-                  subLabel={isUpperCase ? base : shift}
-                  onClick={() => {
-                    playKeySound("char")
-                    handleNumberKey(base, shift)
-                  }}
-                  style={{
-                    animation: `key-stagger-in 0.28s cubic-bezier(0.16,1,0.3,1) ${i * 12}ms both`,
-                  }}
-                />
-              ))}
-            </div>
-          )}
+        {/* ════════════ KEY ROWS ════════════ */}
+        <div className="relative z-10 flex flex-col gap-[6px] px-3 pb-3 pt-1">
+          {rows.map((row, rowIdx) => {
+            const isLastCharRow = rowIdx === rows.length - 1
 
-          {/* ── Letter rows ── */}
-          {!isSymbolsMode && (
-            <div className="flex flex-col gap-1 items-center">
-              {QWERTY_ROWS.map((row, ri) => (
-                <div
-                  key={`lr-${ri}`}
-                  className="flex gap-1 w-full justify-center"
-                >
-                  {/* Shift key — left side of row 3 */}
-                  {ri === 2 && (
-                    <ModKey
-                      onClick={() => {
-                        playKeySound("modifier")
-                        tapShift()
-                      }}
-                      isActive={isShiftActive || isCapsLock}
-                      isCaps={isCapsLock}
-                      ariaLabel={
-                        isCapsLock
-                          ? "CapsLock on (tap to turn off)"
-                          : isShiftActive
-                            ? "Shift active (tap to cancel)"
-                            : "Shift — double-tap for CapsLock"
-                      }
-                      wide
-                    >
-                      {isCapsLock ? (
-                        <>
-                          <Lock className="w-3.5 h-3.5" />
-                          <span className="text-[10px]">CAPS</span>
-                        </>
-                      ) : (
-                        <ArrowBigUp className="w-5 h-5" />
-                      )}
-                    </ModKey>
-                  )}
-
-                  {row.map((key, ki) => (
-                    <CharKey
-                      key={key}
-                      display={
-                        isUpperCase ? key.toUpperCase() : key.toLowerCase()
-                      }
-                      onClick={() => {
-                        playKeySound("char")
-                        handleChar(key)
-                      }}
-                      style={{
-                        animation: `key-stagger-in 0.28s cubic-bezier(0.16,1,0.3,1) ${ri * 8 + ki * 16 + 60}ms both`,
-                      }}
-                    />
-                  ))}
-
-                  {/* Backspace — right side of row 3 */}
-                  {ri === 2 && (
-                    <ModKey
-                      onClick={handleDelete}
-                      isActive={false}
-                      ariaLabel="Backspace"
-                      wide
-                    >
-                      <Delete className="w-5 h-5" />
-                    </ModKey>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* ── Symbol rows ── */}
-          {isSymbolsMode && (
-            <div className="flex flex-col gap-1 items-center">
-              {symRows.map((row, ri) => (
-                <div
-                  key={`sr-${ri}`}
-                  className="flex gap-1 w-full justify-center"
-                >
-                  {row.map((key, ki) => (
-                    <CharKey
-                      key={`${ri}-${ki}`}
-                      display={key}
-                      onClick={() => {
-                        playKeySound("char")
-                        insertAtCursor(key)
-                        setPreviewText(getActiveValue())
-                      }}
-                      style={{
-                        animation: `key-stagger-in 0.22s cubic-bezier(0.16,1,0.3,1) ${ki * 15 + ri * 35}ms both`,
-                      }}
-                    />
-                  ))}
-                  {/* Backspace on last row of symbols */}
-                  {ri === symRows.length - 1 && (
-                    <ModKey
-                      onClick={handleDelete}
-                      isActive={false}
-                      ariaLabel="Backspace"
-                    >
-                      <Delete className="w-4 h-4" />
-                    </ModKey>
-                  )}
-                </div>
-              ))}
-
-              {/* Page 1 / Page 2 toggle */}
-              <button
-                onMouseDown={preventFocusTheft}
-                onClick={() => {
-                  playKeySound("modifier")
-                  toggleSymbolsPage()
-                }}
-                aria-label={
-                  isSymbolsPage2
-                    ? "Back to symbols page 1"
-                    : "More symbols — page 2"
-                }
-                className="mt-1 flex items-center gap-1.5 px-4 py-1.5 bg-slate-800/40 hover:bg-slate-700/60 border border-slate-700/30 hover:border-slate-600 text-slate-400 hover:text-slate-200 rounded-lg text-xs font-bold uppercase tracking-wider transition-all"
-              >
-                {isSymbolsPage2 ? (
-                  <>
-                    <ChevronRight className="w-3 h-3 rotate-180" />
-                    Page 1
-                  </>
-                ) : (
-                  <>
-                    Page 2<ChevronRight className="w-3 h-3" />
-                  </>
+            return (
+              <div key={rowIdx} className="flex gap-[5px] justify-center">
+                {/* Shift / Symbols-page toggle on last letter row */}
+                {isLastCharRow && !isSymbolsMode && (
+                  <Key
+                    label="Shift"
+                    display={
+                      <div className="flex items-center justify-center relative z-10">
+                        {isCapsLock ? (
+                          <ArrowBigUp className="w-5 h-5 fill-current" />
+                        ) : (
+                          <ChevronUp
+                            className={`w-5 h-5 ${isShiftActive ? "stroke-[3]" : ""}`}
+                          />
+                        )}
+                      </div>
+                    }
+                    onPress={tapShift}
+                    flex={1.4}
+                    active={isShiftActive || isCapsLock}
+                    variant="action"
+                    delay={keyIndex++ * 12}
+                  />
                 )}
-              </button>
-            </div>
-          )}
 
-          {/* ── Bottom row ── */}
-          <div className="flex gap-1 w-full justify-center items-center">
-            {/* Symbols toggle */}
-            <button
-              onMouseDown={preventFocusTheft}
-              onClick={() => {
-                playKeySound("modifier")
-                toggleSymbols()
-              }}
-              aria-label={
-                isSymbolsMode ? "Switch to letters" : "Switch to symbols"
+                {isLastCharRow && isSymbolsMode && (
+                  <Key
+                    label={isSymbolsPage2 ? "1/2" : "2/2"}
+                    display={
+                      <span className="text-xs font-bold relative z-10">
+                        {isSymbolsPage2 ? "1/2" : "2/2"}
+                      </span>
+                    }
+                    onPress={toggleSymbolsPage}
+                    flex={1.4}
+                    variant="action"
+                    delay={keyIndex++ * 12}
+                  />
+                )}
+
+                {/* Character keys */}
+                {row.map((char) => (
+                  <Key
+                    key={char}
+                    label={char}
+                    display={
+                      <span className="text-[15px] tracking-wide pointer-events-none relative z-10">
+                        {!isSymbolsMode && shouldUpper
+                          ? char.toUpperCase()
+                          : char}
+                      </span>
+                    }
+                    onPress={() => handleChar(char)}
+                    delay={keyIndex++ * 12}
+                  />
+                ))}
+
+                {/* Backspace on last letter row */}
+                {isLastCharRow && (
+                  <Key
+                    label="Backspace"
+                    display={
+                      <Delete className="w-5 h-5 relative z-10" />
+                    }
+                    onPress={handleBackspace}
+                    flex={1.4}
+                    variant="danger"
+                    delay={keyIndex++ * 12}
+                  />
+                )}
+              </div>
+            )
+          })}
+
+          {/* ── Bottom row: Symbols toggle / Space / Enter ── */}
+          <div className="flex gap-[5px]">
+            <Key
+              label={isSymbolsMode ? "ABC" : "123"}
+              display={
+                <div className="flex items-center gap-1.5 relative z-10">
+                  {isSymbolsMode ? (
+                    <KeyboardIcon className="w-4 h-4" />
+                  ) : (
+                    <Hash className="w-4 h-4" />
+                  )}
+                  <span className="text-xs font-bold">
+                    {isSymbolsMode ? "ABC" : "123"}
+                  </span>
+                </div>
               }
-              aria-pressed={isSymbolsMode}
-              className={`h-11 px-3 rounded-xl flex items-center justify-center gap-1 border text-xs font-bold uppercase tracking-wider transition-all shrink-0 ${
-                isSymbolsMode
-                  ? "bg-[#6b9dfe]/20 border-[#6b9dfe]/40 text-[#6b9dfe]"
-                  : "bg-slate-800/40 border-slate-700/30 text-slate-400 hover:bg-slate-700/60 hover:text-slate-200"
-              }`}
-            >
-              {isSymbolsMode ? "ABC" : "!#1"}
-            </button>
+              onPress={toggleSymbols}
+              flex={1.5}
+              variant="action"
+              active={isSymbolsMode}
+              delay={keyIndex++ * 12}
+            />
 
-            {/* CapsLock dedicated button (letters mode only) */}
-            {!isSymbolsMode && (
-              <ModKey
-                onClick={() => {
-                  playKeySound("modifier")
-                  toggleCapsLock()
-                }}
-                isActive={isCapsLock}
-                isCaps={isCapsLock}
-                ariaLabel={
-                  isCapsLock
-                    ? "CapsLock ON — tap to turn off"
-                    : "CapsLock — tap to turn on"
-                }
-              >
-                <Lock className="w-4 h-4" />
-              </ModKey>
-            )}
+            <Key
+              label="Globe"
+              display={<Globe className="w-4 h-4 relative z-10" />}
+              onPress={() => {}}
+              flex={0.8}
+              variant="action"
+              delay={keyIndex++ * 12}
+            />
 
-            {/* Space */}
-            <button
-              onMouseDown={preventFocusTheft}
-              onClick={() => {
-                playKeySound("space")
-                insertAtCursor(" ")
-                setPreviewText(getActiveValue())
-              }}
-              aria-label="Space"
-              className="flex-1 h-11 bg-slate-800/40 hover:bg-[#6b9dfe]/15 active:scale-95 rounded-xl border border-slate-700/30 hover:border-[#6b9dfe]/30 text-slate-500 hover:text-slate-300 flex items-center justify-center gap-2 text-xs font-bold tracking-[0.25em] uppercase transition-all"
-            >
-              <Space className="w-4 h-4 opacity-40" />
-              Space
-            </button>
+            <Key
+              label="Space"
+              display={
+                <div className="flex items-center gap-2 relative z-10">
+                  <Space className="w-4 h-4 text-slate-500" />
+                  <span className="text-xs text-slate-400 font-medium tracking-wider">
+                    space
+                  </span>
+                </div>
+              }
+              onPress={handleSpace}
+              flex={4}
+              delay={keyIndex++ * 12}
+            />
 
-            {/* Enter */}
-            <button
-              onMouseDown={preventFocusTheft}
-              onClick={() => {
-                playKeySound("enter")
-                pressEnterAtCursor()
-              }}
-              aria-label="Enter"
-              className="h-11 px-4 bg-[#6b9dfe]/20 hover:bg-[#6b9dfe]/35 active:scale-95 rounded-xl flex items-center justify-center gap-1.5 border border-[#6b9dfe]/30 hover:border-[#6b9dfe]/60 text-[#6b9dfe] hover:text-white text-xs font-bold uppercase tracking-wider transition-all shrink-0"
-            >
-              <CornerDownLeft className="w-3.5 h-3.5" />
-              Enter
-            </button>
+            <Key
+              label="Enter"
+              display={
+                <div className="flex items-center gap-1.5 relative z-10">
+                  <CornerDownLeft className="w-4 h-4" />
+                  <span className="text-xs font-bold tracking-wide">
+                    return
+                  </span>
+                </div>
+              }
+              onPress={handleEnter}
+              flex={1.8}
+              variant="primary"
+              delay={keyIndex++ * 12}
+            />
           </div>
         </div>
 
-        {/* Bottom glow */}
-        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[#22d3ee]/30 to-transparent" />
+        {/* ── Bottom holographic edge ── */}
+        <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/[0.06] to-transparent" />
       </div>
     </div>
   )

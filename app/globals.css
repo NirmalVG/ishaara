@@ -254,40 +254,95 @@ input[type="range"]::-moz-range-thumb {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   KEYBOARD KEY STYLES
+   KEYBOARD KEY STYLES — Ultra Glassmorphism
    ═══════════════════════════════════════════════════════════════ */
 
 .kb-key {
   position: relative;
   overflow: hidden;
-  transition: all 0.12s cubic-bezier(0.23, 1, 0.32, 1);
+  transition: all 0.15s cubic-bezier(0.23, 1, 0.32, 1);
   will-change: transform, box-shadow;
+  -webkit-tap-highlight-color: transparent;
 }
 
+/* Radial glow on hover */
 .kb-key::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: radial-gradient(circle at center, rgba(107, 157, 254, 0.15), transparent 70%);
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    rgba(107, 157, 254, 0.2) 0%,
+    rgba(107, 157, 254, 0.06) 40%,
+    transparent 75%
+  );
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.25s ease;
   pointer-events: none;
+  z-index: 0;
+}
+
+/* Holographic shimmer sweep */
+.kb-key::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.04) 40%,
+    rgba(107, 157, 254, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 60%,
+    transparent 100%
+  );
+  transition: left 0.5s ease;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .kb-key:hover::before {
   opacity: 1;
 }
 
-.kb-key:active {
-  transform: scale(0.9) !important;
+.kb-key:hover::after {
+  left: 100%;
 }
 
-/* Ripple container for key press */
+.kb-key:active {
+  transform: scale(0.88) !important;
+  transition-duration: 0.08s;
+}
+
+/* Ripple burst on key press */
 .kb-key .ripple {
   position: absolute;
   border-radius: 50%;
-  background: rgba(107, 157, 254, 0.5);
+  background: radial-gradient(
+    circle,
+    rgba(107, 157, 254, 0.6) 0%,
+    rgba(107, 157, 254, 0.2) 40%,
+    transparent 70%
+  );
   animation: key-press-ripple 0.5s ease-out forwards;
   pointer-events: none;
+  z-index: 1;
+}
+
+/* ── Keyboard backdrop noise texture ── */
+@keyframes kb-noise {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-1%, -1%); }
+  30% { transform: translate(1%, 2%); }
+  50% { transform: translate(-2%, 1%); }
+  70% { transform: translate(2%, -1%); }
+  90% { transform: translate(-1%, 2%); }
+}
+
+@keyframes kb-glow-breathe {
+  0%, 100% { opacity: 0.03; }
+  50% { opacity: 0.07; }
 }

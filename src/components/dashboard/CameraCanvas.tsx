@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   Hand,
   Loader2,
@@ -11,12 +11,12 @@ import {
   ThumbsUp,
   Cpu,
   ShieldCheck,
-} from "lucide-react"
-import { handTracker } from "@/lib/handTracking"
-import type { GestureType } from "@/lib/gestureEngine"
-import { DrawingUtils, HandLandmarker } from "@mediapipe/tasks-vision"
-import { useInputSettings } from "@/store/useInputSettings"
-import { isMobileDevice } from "@/utils/isMobile"
+} from "lucide-react";
+import { handTracker } from "@/lib/handTracking";
+import type { GestureType } from "@/lib/gestureEngine";
+import { DrawingUtils, HandLandmarker } from "@mediapipe/tasks-vision";
+import { useInputSettings } from "@/store/useInputSettings";
+import { isMobileDevice } from "@/utils/isMobile";
 
 const GESTURE_LABELS: Record<GestureType, { label: string }> = {
   None: { label: "Move hand to begin" },
@@ -25,25 +25,25 @@ const GESTURE_LABELS: Record<GestureType, { label: string }> = {
   Fist: { label: "Hold for Keyboard" },
   Peace: { label: "Copy (Peace Sign)" },
   ThumbsUp: { label: "Paste (Thumbs Up)" },
-}
+};
 
 function GestureIcon({ gesture }: { gesture: GestureType }) {
-  const cls = "w-5 h-5"
+  const cls = "w-5 h-5";
   switch (gesture) {
     case "Pinch":
       return (
         <MousePointerClick className={`${cls} text-white animate-bounce`} />
-      )
+      );
     case "TwoFingers":
-      return <ArrowUpDown className={`${cls} text-cyan-400`} />
+      return <ArrowUpDown className={`${cls} text-cyan-400`} />;
     case "Fist":
-      return <Keyboard className={`${cls} text-amber-400`} />
+      return <Keyboard className={`${cls} text-amber-400`} />;
     case "Peace":
-      return <Copy className={`${cls} text-emerald-400`} />
+      return <Copy className={`${cls} text-emerald-400`} />;
     case "ThumbsUp":
-      return <ThumbsUp className={`${cls} text-violet-400`} />
+      return <ThumbsUp className={`${cls} text-violet-400`} />;
     default:
-      return <Hand className={`${cls} text-[#6B9DFE]`} />
+      return <Hand className={`${cls} text-[#6B9DFE]`} />;
   }
 }
 
@@ -66,38 +66,38 @@ function GestureIcon({ gesture }: { gesture: GestureType }) {
  * is guaranteed to be available when the cleanup executes.
  */
 export default function CameraCanvas() {
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [isReady, setIsReady] = useState(false)
-  const [currentGesture, setCurrentGesture] = useState<GestureType>("None")
-  const [fps, setFps] = useState(0)
-  const [latency, setLatency] = useState(0)
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isReady, setIsReady] = useState(false);
+  const [currentGesture, setCurrentGesture] = useState<GestureType>("None");
+  const [fps, setFps] = useState(0);
+  const [latency, setLatency] = useState(0);
 
-  const fpsFrames = useRef(0)
-  const fpsLastTime = useRef(0)
-  const showLandmarks = useInputSettings((s) => s.showLandmarks)
+  const fpsFrames = useRef(0);
+  const fpsLastTime = useRef(0);
+  const showLandmarks = useInputSettings((s) => s.showLandmarks);
 
   const updateFps = useCallback(() => {
-    fpsFrames.current++
-    const now = performance.now()
-    const delta = now - fpsLastTime.current
+    fpsFrames.current++;
+    const now = performance.now();
+    const delta = now - fpsLastTime.current;
     if (delta >= 1000) {
-      setFps(Math.round((fpsFrames.current * 1000) / delta))
-      fpsFrames.current = 0
-      fpsLastTime.current = now
+      setFps(Math.round((fpsFrames.current * 1000) / delta));
+      fpsFrames.current = 0;
+      fpsLastTime.current = now;
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    if (isMobileDevice()) return
+    if (isMobileDevice()) return;
 
-    let animationFrameId: number
-    fpsLastTime.current = performance.now()
+    let animationFrameId: number;
+    fpsLastTime.current = performance.now();
     // Closure-captured stream — survives StrictMode double-invoke cleanup
-    let capturedStream: MediaStream | null = null
+    let capturedStream: MediaStream | null = null;
 
     async function startSystem() {
-      await handTracker.initialize()
+      await handTracker.initialize();
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
@@ -105,69 +105,69 @@ export default function CameraCanvas() {
             height: { ideal: 480 },
             frameRate: { ideal: 30 },
           },
-        })
-        capturedStream = stream // Capture in closure, not ref
+        });
+        capturedStream = stream; // Capture in closure, not ref
 
         if (videoRef.current) {
-          videoRef.current.srcObject = stream
+          videoRef.current.srcObject = stream;
           videoRef.current.onloadedmetadata = () => {
-            videoRef.current?.play()
-            setIsReady(true)
-            animationFrameId = requestAnimationFrame(renderLoop)
-          }
+            videoRef.current?.play();
+            setIsReady(true);
+            animationFrameId = requestAnimationFrame(renderLoop);
+          };
         }
       } catch (error) {
-        console.error("Camera access denied:", error)
+        console.error("Camera access denied:", error);
       }
     }
 
-    let lastVideoTime = -1
-    let drawingUtils: DrawingUtils | null = null
-    let lastAiRunTime = 0
-    const AI_FPS_LIMIT = 1000 / 20
+    let lastVideoTime = -1;
+    let drawingUtils: DrawingUtils | null = null;
+    let lastAiRunTime = 0;
+    const AI_FPS_LIMIT = 1000 / 20;
 
     const renderLoop = (currentTime: number = performance.now()) => {
       if (!videoRef.current || !canvasRef.current || !handTracker.isReady)
-        return
+        return;
 
-      const video = videoRef.current
-      const canvas = canvasRef.current
-      const ctx = canvas.getContext("2d")
-      if (!ctx) return
+      const video = videoRef.current;
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
       if (canvas.width !== video.videoWidth) {
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
       }
 
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      ctx.save()
-      ctx.scale(-1, 1)
-      ctx.translate(-canvas.width, 0)
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.translate(-canvas.width, 0);
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
       if (
         currentTime - lastAiRunTime >= AI_FPS_LIMIT &&
         video.currentTime !== lastVideoTime
       ) {
-        lastAiRunTime = currentTime
-        lastVideoTime = video.currentTime
+        lastAiRunTime = currentTime;
+        lastVideoTime = video.currentTime;
 
-        const t0 = performance.now()
-        const results = handTracker.detect(video, performance.now())
-        const t1 = performance.now()
-        setLatency(Math.round(t1 - t0))
+        const t0 = performance.now();
+        const results = handTracker.detect(video, performance.now());
+        const t1 = performance.now();
+        setLatency(Math.round(t1 - t0));
 
-        const detectedHands = results?.landmarks ?? []
+        const detectedHands = results?.landmarks ?? [];
 
         if (detectedHands.length > 0) {
           // Read the gesture computed by VirtualCursor's rAF loop.
           // If VirtualCursor hasn't run yet this frame, this falls back to
           // the previous frame's gesture — acceptable for a display badge.
-          const detected = handTracker.lastDetectedGesture
+          const detected = handTracker.lastDetectedGesture;
 
           if (showLandmarks) {
-            if (!drawingUtils) drawingUtils = new DrawingUtils(ctx)
+            if (!drawingUtils) drawingUtils = new DrawingUtils(ctx);
             for (const landmarks of detectedHands) {
               drawingUtils.drawConnectors(
                 landmarks,
@@ -176,38 +176,38 @@ export default function CameraCanvas() {
                   color: "#6B9DFE",
                   lineWidth: 5,
                 },
-              )
+              );
               drawingUtils.drawLandmarks(landmarks, {
                 color: "#ffffff",
                 lineWidth: 2,
                 radius: 4,
-              })
+              });
             }
           }
 
-          setCurrentGesture((prev) => (prev !== detected ? detected : prev))
+          setCurrentGesture((prev) => (prev !== detected ? detected : prev));
         } else {
-          setCurrentGesture("None")
+          setCurrentGesture("None");
         }
       }
 
-      ctx.restore()
-      updateFps()
-      animationFrameId = requestAnimationFrame(renderLoop)
-    }
+      ctx.restore();
+      updateFps();
+      animationFrameId = requestAnimationFrame(renderLoop);
+    };
 
-    startSystem()
+    startSystem();
 
     return () => {
-      cancelAnimationFrame(animationFrameId)
+      cancelAnimationFrame(animationFrameId);
       // Use closure variable — reliable even if videoRef.current is null
-      capturedStream?.getTracks().forEach((track) => track.stop())
-      capturedStream = null
-    }
-  }, [updateFps, showLandmarks])
+      capturedStream?.getTracks().forEach((track) => track.stop());
+      capturedStream = null;
+    };
+  }, [updateFps, showLandmarks]);
 
-  const gestureInfo = GESTURE_LABELS[currentGesture]
-  const isActive = currentGesture !== "None"
+  const gestureInfo = GESTURE_LABELS[currentGesture];
+  const isActive = currentGesture !== "None";
 
   return (
     <div className="relative w-full h-[500px] lg:h-full min-h-[400px] bg-[#131823] border border-slate-800 rounded-2xl overflow-hidden flex flex-col justify-between p-5">
@@ -298,5 +298,5 @@ export default function CameraCanvas() {
       <div className="absolute top-5 left-5 w-8 h-8 border-t-2 border-l-2 border-slate-700/60 rounded-tl-lg z-10 pointer-events-none" />
       <div className="absolute bottom-5 right-5 w-8 h-8 border-b-2 border-r-2 border-slate-700/60 rounded-br-lg z-10 pointer-events-none" />
     </div>
-  )
+  );
 }
