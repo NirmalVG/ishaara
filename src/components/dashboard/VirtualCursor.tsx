@@ -19,6 +19,8 @@ export default function VirtualCursor() {
   const fistDropTimeRef = useRef(0)
   const gestureCooldownRef = useRef(0)
   const lastClipboardActionTimeRef = useRef(0)
+  const peaceHoldStartRef = useRef(0)
+  const thumbsUpHoldStartRef = useRef(0)
   const prevFocusYRef = useRef<number | null>(null)
   const lastFrameTimeRef = useRef(0)
   const smoothedAiRef = useRef({ x: 0, y: 0 })
@@ -146,6 +148,9 @@ export default function VirtualCursor() {
             useKeyboardStore.getState().toggle()
             fistStartTimeRef.current = 0
             gestureCooldownRef.current = now
+            // Suppress clipboard actions during hand release — the thumb
+            // extends first when opening a fist, briefly triggering ThumbsUp.
+            lastClipboardActionTimeRef.current = now
           }
         } else if (fistStartTimeRef.current > 0) {
           if (fistDropTimeRef.current === 0) {
@@ -156,41 +161,57 @@ export default function VirtualCursor() {
           }
         }
 
-        if (
-          currentGesture === "Peace" &&
-          now - lastClipboardActionTimeRef.current > 2000
-        ) {
-          const selectedText = window.getSelection()?.toString()
-          if (selectedText) {
-            navigator.clipboard
-              .writeText(selectedText)
-              .then(() => showClipboardAction("Copied!"))
-              .catch(() => undefined)
+        // ── Peace (Copy) — requires 500ms sustained hold ──
+        if (currentGesture === "Peace") {
+          if (peaceHoldStartRef.current === 0) {
+            peaceHoldStartRef.current = now
+          } else if (
+            now - peaceHoldStartRef.current > 500 &&
+            now - lastClipboardActionTimeRef.current > 2000
+          ) {
+            const selectedText = window.getSelection()?.toString()
+            if (selectedText) {
+              navigator.clipboard
+                .writeText(selectedText)
+                .then(() => showClipboardAction("Copied!"))
+                .catch(() => undefined)
+            }
+            lastClipboardActionTimeRef.current = now
+            peaceHoldStartRef.current = 0 // reset so it doesn't re-fire
           }
-          lastClipboardActionTimeRef.current = now
+        } else {
+          peaceHoldStartRef.current = 0
         }
 
-        if (
-          currentGesture === "ThumbsUp" &&
-          now - lastClipboardActionTimeRef.current > 2000
-        ) {
-          navigator.clipboard
-            .readText()
-            .then((text) => {
-              const element = document.activeElement
-              if (
-                element instanceof HTMLInputElement ||
-                element instanceof HTMLTextAreaElement
-              ) {
-                const start = element.selectionStart ?? 0
-                const end = element.selectionEnd ?? 0
-                element.setRangeText(text, start, end, "end")
-                element.dispatchEvent(new Event("input", { bubbles: true }))
-                showClipboardAction("Pasted!")
-              }
-            })
-            .catch(() => undefined)
-          lastClipboardActionTimeRef.current = now
+        // ── ThumbsUp (Paste) — requires 500ms sustained hold ──
+        if (currentGesture === "ThumbsUp") {
+          if (thumbsUpHoldStartRef.current === 0) {
+            thumbsUpHoldStartRef.current = now
+          } else if (
+            now - thumbsUpHoldStartRef.current > 500 &&
+            now - lastClipboardActionTimeRef.current > 2000
+          ) {
+            navigator.clipboard
+              .readText()
+              .then((text) => {
+                const element = document.activeElement
+                if (
+                  element instanceof HTMLInputElement ||
+                  element instanceof HTMLTextAreaElement
+                ) {
+                  const start = element.selectionStart ?? 0
+                  const end = element.selectionEnd ?? 0
+                  element.setRangeText(text, start, end, "end")
+                  element.dispatchEvent(new Event("input", { bubbles: true }))
+                  showClipboardAction("Pasted!")
+                }
+              })
+              .catch(() => undefined)
+            lastClipboardActionTimeRef.current = now
+            thumbsUpHoldStartRef.current = 0 // reset so it doesn't re-fire
+          }
+        } else {
+          thumbsUpHoldStartRef.current = 0
         }
 
         if (isPinching !== wasClickingRef.current) {
